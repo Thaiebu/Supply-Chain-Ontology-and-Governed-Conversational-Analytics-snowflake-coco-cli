@@ -1,0 +1,128 @@
+== CoCo Lifecycle Evidence Log: EXECUTION ==
+Phase: EXECUTION
+Date: 2026-09-27 (initial), 2026-09-29 (re-executed & verified on Snowflake)
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. STAGE ARTIFACT UPLOAD & DIRECTORY REFRESH
+================================================================================
+Command:
+  PUT file:///Users/mohamedthaiebu/Documents/Hackskill-hackethon/Snowflake_coco_cli/semantic_model/supply_chain_ontology.yaml 
+      @SUPPLY_CHAIN_DB.ANALYTICS.SEMANTIC_MODELS_STAGE 
+      AUTO_COMPRESS=FALSE 
+      OVERWRITE=TRUE;
+
+Execution Output:
+  File: supply_chain_ontology.yaml
+  Status: UPLOADED
+  Source: 32,006 bytes
+  Target: 32,006 bytes (encryption: SNOWFLAKE_SSE)
+
+Verification:
+  ALTER STAGE SUPPLY_CHAIN_DB.ANALYTICS.SEMANTIC_MODELS_STAGE REFRESH;
+  LIST @SUPPLY_CHAIN_DB.ANALYTICS.SEMANTIC_MODELS_STAGE;
+  Result: supply_chain_ontology.yaml confirmed present (md5: 1cbe011f39c07857a130101954861e25).
+
+================================================================================
+2. DYNAMIC TABLE PIPELINE EXECUTION & REFRESH
+================================================================================
+Command:
+  -- Insert test pipeline events into staging
+  INSERT INTO STAGING.RAW_DELIVERY_EVENTS (event_id, po_id, event_timestamp, raw_status_code, source_system)
+  VALUES 
+    ('EVT-001', 'PO-0001', CURRENT_TIMESTAMP(), 'DLV', 'SAP_ERP'),
+    ('EVT-002', 'PO-0002', CURRENT_TIMESTAMP(), 'DELAY', 'ORACLE_WMS'),
+    ('EVT-003', 'PO-0003', CURRENT_TIMESTAMP(), 'RECEIVED', 'SAP_ERP'),
+    ('EVT-004', 'PO-0004', CURRENT_TIMESTAMP(), 'LATE', 'CARRIER_EDI'),
+    ('EVT-005', 'PO-0005', CURRENT_TIMESTAMP(), 'TRANSIT', 'IOT_GATEWAY');
+
+  -- Execute downstream dynamic table refresh
+  ALTER DYNAMIC TABLE ANALYTICS.DT_DELIVERY_SUMMARY REFRESH;
+
+Execution Output:
+  Status: REFRESH SUCCESSFUL
+  Inserted Rows: 5
+  Data Timestamp: 2026-09-29 00:11:20.338 -0700
+  Normalized Statuses Verified:
+    PO-0001 -> DELIVERED
+    PO-0002 -> DELAYED
+    PO-0003 -> DELIVERED
+    PO-0004 -> DELAYED
+    PO-0005 -> IN_TRANSIT
+
+================================================================================
+3. FULL DATA PIPELINE VERIFICATION
+================================================================================
+Row Count Verification (executed 2026-09-29):
+  DIM_SUPPLIER:        20 rows
+  DIM_PLANT:            5 rows
+  DIM_CUSTOMER:        25 rows
+  DIM_PART:            30 rows
+  FCT_PURCHASE_ORDERS: 500 rows
+  FCT_SHIPMENTS:       600 rows
+  FCT_CUSTOMER_ORDERS: 800 rows
+  RAW_DELIVERY_EVENTS:   5 rows
+  DT_DELIVERY_SUMMARY:   5 rows
+  TOTAL: 1,990 rows across 9 objects
+
+Canonical Metric Spot-Check (executed 2026-09-29):
+  Supplier OTD (Procurement):  86.61% (388/448 closed POs on time)
+  Carrier OTD (Logistics):     47.52% (249/524 delivered shipments on time)
+  Customer OTIF (Planning):     5.39% (40/742 shipped orders on time + in full)
+  Enterprise OTD (Weighted):   39.50% (blended across all 3 channels)
+  PO Fill Rate:                98.53%
+  Top Landed Cost Supplier:    Bosch Components @ $229.43/unit
+
+================================================================================
+4. DOCUMENT INTELLIGENCE PIPELINE EXECUTION (2026-09-29)
+================================================================================
+Step 1: Contract Upload
+  PUT file://contracts/supplier_sla_agreement.txt
+      @SUPPLY_CHAIN_DB.ANALYTICS.CONTRACT_DOCUMENTS_STAGE
+  Result: UPLOADED (6,441 bytes)
+  Raw text loaded into RAW_CONTRACT_DOCUMENTS (1 row)
+
+Step 2: Cortex AI Extraction
+  SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b') called on unstructured contract text
+  -> LATERAL FLATTEN on JSON output -> INSERT into SUPPLIER_CONTRACT_SLAS
+  Result: 20/20 supplier SLA records extracted successfully
+
+Step 3: SLA Compliance View
+  V_SLA_VS_ACTUAL_OTD created joining extracted SLAs to actual PO data
+  Result: 10 BREACH | 4 WARNING | 6 MEETING SLA
+
+================================================================================
+5. STREAMLIT APPLICATION EXECUTION
+================================================================================
+Command:
+  SNOWFLAKE_DEFAULT_CONNECTION_NAME=WZ37797 streamlit run streamlit/app.py
+
+Execution Output:
+  Uvicorn server started on :::8501
+  Local URL:   http://localhost:8501
+  Network URL: http://192.168.1.44:8501
+  Snowflake Connection: Established with connection WZ37797
+  Warehouse: COMPUTE_WH (Active)
+  Cortex Analyst Endpoint: Active & responding
+
+================================================================================
+6. MCP SERVER TOOL EXECUTION (2026-09-29)
+================================================================================
+Test 1: check_otd_breach('SUP-009')
+  Result: CRITICAL BREACH — Siemens Industrial at 72.22% vs 96% SLA (-23.78pts)
+  Escalation: Level 2 Corrective Action Plan triggered
+  Verdict: PASS
+
+Test 2: check_otd_breach('SUP-001')
+  Result: OK — Tata Steel Supply at 94.74% vs 90% SLA (+4.74pts)
+  Verdict: PASS
+
+Test 3: sla_compliance_report()
+  Result: 20 suppliers — 10 BREACH | 4 WARNING | 6 MEETING SLA
+  Top breach: Siemens Industrial (gap: -23.78pts)
+  Top performer: Reliance Components (gap: +8.15pts)
+  Verdict: PASS
+
+All 3 MCP tool invocations returned correct data from live Snowflake.
+

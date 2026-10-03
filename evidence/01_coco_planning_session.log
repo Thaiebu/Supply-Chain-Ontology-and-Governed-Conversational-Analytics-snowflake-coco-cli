@@ -1,0 +1,89 @@
+== CoCo Lifecycle Evidence Log: PLANNING ==
+Phase: PLANNING
+Date: 2026-09-27 (initial), 2026-09-29 (re-executed & verified)
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. SESSION CONTEXT & ENVIRONMENT VERIFICATION
+================================================================================
+Command:
+  SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE(), CURRENT_VERSION();
+
+Result:
+  User:      THAIEBU785
+  Role:      ACCOUNTADMIN
+  Warehouse: COMPUTE_WH
+  Version:   10.35.101
+
+================================================================================
+2. PROBLEM FRAMING & ONTOLOGY DESIGN
+================================================================================
+Problem Statement:
+  Supply chain data is fragmented across ERP, logistics, and planning silos.
+  Three different personas ask "What is our on-time delivery rate?" and get
+  conflicting answers:
+    - Procurement: 91% (measured against supplier promised delivery date)
+    - Logistics:   88% (measured against carrier transit SLA)
+    - Planning:    82% (measured against customer requested date)
+  A raw LLM chatbot exacerbates this by hallucinating single-table queries
+  with integer division errors (returning 0.0%).
+
+Solution Design:
+  Build a unified Supply Chain Ontology expressed as a Snowflake Semantic View
+  and Cortex Analyst Semantic Model YAML over 7 tables:
+    DIM_SUPPLIER -> DIM_PART -> DIM_PLANT -> FCT_PURCHASE_ORDERS -> FCT_SHIPMENTS -> FCT_CUSTOMER_ORDERS -> DIM_CUSTOMER
+
+Canonical Metrics Defined:
+  1. Inbound Supplier OTD (Procurement Lens): receipt_date <= promised_date
+  2. Carrier Transit OTD (Logistics Lens): actual_delivery_date <= estimated_delivery_date
+  3. Customer OTIF (Planning Lens): shipped_date <= request_date AND shipped_qty >= ordered_qty
+  4. Enterprise Canonical OTD (Executive Lens): Weighted multi-channel average
+  5. Fill Rate: order fulfillment percentage
+  6. Landed Cost: unit_cost + freight/unit + customs/unit
+  7. Days of Inventory (DOI proxy)
+
+================================================================================
+3. DATABASE & SCHEMA ARCHITECTURE
+================================================================================
+DDL Executed:
+  CREATE DATABASE IF NOT EXISTS SUPPLY_CHAIN_DB;
+  CREATE SCHEMA IF NOT EXISTS SUPPLY_CHAIN_DB.ANALYTICS;
+  CREATE SCHEMA IF NOT EXISTS SUPPLY_CHAIN_DB.STAGING;
+
+Active Context:
+  USE DATABASE SUPPLY_CHAIN_DB;
+  USE SCHEMA ANALYTICS;
+
+Stage Setup:
+  CREATE STAGE IF NOT EXISTS SUPPLY_CHAIN_DB.ANALYTICS.SEMANTIC_MODELS_STAGE
+    DIRECTORY = (ENABLE = TRUE)
+    ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
+
+================================================================================
+4. THE "REALITY CHECK" TEST
+================================================================================
+Objective:
+  Test whether Snowflake account supports CREATE SEMANTIC VIEW DDL or requires
+  YAML semantic model file on internal stage.
+
+Test Table & Object:
+  CREATE OR REPLACE TABLE ANALYTICS.TEST_OTD (
+    po_id VARCHAR,
+    promised_date DATE,
+    receipt_date DATE
+  );
+  INSERT INTO ANALYTICS.TEST_OTD VALUES 
+    ('PO-1', '2026-09-01', '2026-09-01'), 
+    ('PO-2', '2026-09-01', '2026-09-05');
+
+Test DDL:
+  CREATE OR REPLACE SEMANTIC VIEW ANALYTICS.TEST_SV ...
+  Result: SUCCESS -- CREATE SEMANTIC VIEW DDL is natively supported.
+
+Strategy Decision:
+  Deploy dual-layer governance:
+  1. Semantic Model YAML uploaded to @SEMANTIC_MODELS_STAGE for Cortex Analyst REST API.
+  2. Semantic View DDL in Snowflake catalog for native SQL queries.
+  This ensures 100% compatibility across Cortex Analyst, CoCo CLI, and Streamlit.
+

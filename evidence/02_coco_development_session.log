@@ -1,0 +1,192 @@
+== CoCo Lifecycle Evidence Log: DEVELOPMENT ==
+Phase: DEVELOPMENT
+Date: 2026-09-27 (initial), 2026-09-29 (re-executed & verified on Snowflake)
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. STEP 1.1: PHYSICAL DATA MODEL DDL (sql/02_ddl_tables.sql)
+================================================================================
+Prompt to CoCo:
+  "Generate DDL for our 7 supply chain tables in SUPPLY_CHAIN_DB.ANALYTICS:
+   4 Dimensions (DIM_SUPPLIER, DIM_PLANT, DIM_CUSTOMER, DIM_PART) and 
+   3 Facts (FCT_PURCHASE_ORDERS, FCT_SHIPMENTS, FCT_CUSTOMER_ORDERS).
+   Include Landed Cost columns in POs and enforce PK/FK constraints."
+
+Objects Created:
+  - DIM_SUPPLIER        (supplier_id PK, supplier_name, country, lead_time_days, rating)
+  - DIM_PLANT           (plant_id PK, plant_name, city, country, capacity_units)
+  - DIM_CUSTOMER        (customer_id PK, customer_name, industry, country, tier)
+  - DIM_PART            (part_id PK, part_name, category, unit_cost, supplier_id FK, plant_id FK)
+  - FCT_PURCHASE_ORDERS (po_id PK, part_id FK, supplier_id FK, plant_id FK, order_qty, received_qty, unit_cost_ea, freight_cost, customs_tariff_cost, promised_date, receipt_date, po_status)
+  - FCT_SHIPMENTS       (ship_id PK, po_id FK, carrier_name, origin_plant_id FK, dest_plant_id FK, ship_date, estimated_delivery_date, actual_delivery_date, transit_status)
+  - FCT_CUSTOMER_ORDERS (order_id PK, customer_id FK, part_id FK, plant_id FK, ordered_qty, shipped_qty, request_date, shipped_date, delivery_status, unit_price, freight_cost, customs_duty)
+
+Status: 7/7 tables verified in INFORMATION_SCHEMA.TABLES.
+
+================================================================================
+2. STEP 1.2: SYNTHETIC DATA GENERATION (sql/03_seed_data.sql)
+================================================================================
+Prompt to CoCo:
+  "Generate realistic synthetic data for our supply chain tables with referential
+   integrity. Target: 20 suppliers (India, UAE, Germany, USA, China), 5 plants,
+   25 customers across 3 tiers, 30 parts across 4 categories, 500 POs (~15% late),
+   600 shipments (~8% carrier delay), and 800 customer orders (~12% late, 5% partial fill)."
+
+Execution Results:
+  - DIM_SUPPLIER:        20 rows
+  - DIM_PLANT:            5 rows
+  - DIM_CUSTOMER:        25 rows
+  - DIM_PART:            30 rows (ELECTRONICS x7, MECHANICAL x8, PACKAGING x6, RAW_MATERIAL x9)
+  - FCT_PURCHASE_ORDERS: 500 rows
+  - FCT_SHIPMENTS:       600 rows
+  - FCT_CUSTOMER_ORDERS: 800 rows
+
+Calibration & Variance Check (verified 2026-09-29):
+  - PO Late Delivery Rate:        13.4%  (target ~15%) -> VALID
+  - Shipment Carrier Delay Rate:   7.2%  (target ~8%)  -> VALID
+  - Customer Order Late Rate:      11.4% (target ~12%) -> VALID
+  - Customer Order Partial Fill:   3.9%  (target ~5%)  -> VALID
+
+================================================================================
+3. STEP 1.3: DYNAMIC TABLE & PIPELINE (sql/04_dynamic_table_pipeline.sql)
+================================================================================
+Prompt to CoCo:
+  "Create a staging table STAGING.RAW_DELIVERY_EVENTS for raw ERP events and a
+   Dynamic Table ANALYTICS.DT_DELIVERY_SUMMARY with TARGET_LAG = 'DOWNSTREAM'
+   that cleans and normalizes messy status codes."
+
+Created:
+  - STAGING.RAW_DELIVERY_EVENTS
+  - ANALYTICS.DT_DELIVERY_SUMMARY
+    Normalization logic:
+      DLV/COMPL/RECEIVED -> DELIVERED
+      DELAY/HOLD/LATE    -> DELAYED
+      ELSE               -> IN_TRANSIT
+
+================================================================================
+4. STEP 2: SEMANTIC MODEL AUTHORING (semantic_model/supply_chain_ontology.yaml)
+================================================================================
+Prompt to CoCo:
+  "Author the Cortex Analyst semantic model YAML file supply_chain_ontology.yaml.
+   Include all 7 tables, 11 relationships, dimensions with explicit data_type and
+   FK join columns, 4 canonical metrics (OTD, Fill Rate, DOI, Landed Cost), and
+   14 verified queries covering all supply chain personas."
+
+Model Metrics Defined:
+  1. supplier_otd_rate on FCT_PURCHASE_ORDERS (Procurement Lens)
+  2. carrier_otd_rate on FCT_SHIPMENTS (Logistics Lens)
+  3. customer_otif_rate on FCT_CUSTOMER_ORDERS (Planning Lens)
+  4. enterprise_otd_rate (Canonical Multi-Table Weighted Average)
+  5. fill_rate (PO & Customer fulfillments)
+  6. landed_cost_avg (unit_cost + freight/unit + customs/unit)
+  7. days_of_inventory (Inventory coverage proxy)
+
+Verified Queries (14 Golden Queries):
+  1. overall_supplier_otd          2. supplier_otd_by_country
+  3. carrier_otd_by_carrier        4. customer_otif
+  5. customer_otif_by_tier         6. fill_rate_overall
+  7. fill_rate_by_category         8. avg_landed_cost_by_supplier
+  9. landed_cost_by_category      10. days_of_inventory_estimate
+ 11. top_late_suppliers           12. plant_volume_summary
+ 13. enterprise_otd_summary       14. monthly_po_trend
+
+Schema Refinement:
+  Added explicit data_type to all dimensions and exposed FK dimensions to
+  support complex multi-table Cortex Analyst joins without inference errors.
+  Final YAML size: 32,006 bytes (851 lines).
+
+================================================================================
+5. STEP 4: STREAMLIT APPLICATION DEVELOPMENT (streamlit/app.py)
+================================================================================
+Prompt to CoCo:
+  "Build a Streamlit in Snowflake application (app.py) with:
+   1. Persona selector dropdown (VP Executive, Procurement Manager, Logistics Director, Supply Chain Planner).
+   2. Governed vs. Ungoverned toggle (Cortex Analyst vs Raw LLM text-to-SQL).
+   3. Side-by-side comparison mode.
+   4. SQL & Formula Transparency drawer showing generated SQL, lineage, and audit trace.
+   5. Metric catalog sidebar."
+
+File Created:
+  streamlit/app.py (503 lines)
+  - Uses Cortex Analyst REST API for Governed mode
+  - Uses SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b') for Ungoverned mode
+  - Custom UI with persona-driven default questions and metric explainers.
+
+================================================================================
+6. STEP 5: REUSABLE COCO SKILL AUTHORING (.cortex/skills/)
+================================================================================
+Prompt to CoCo:
+  "Create a reusable custom CoCo skill called 'supply-chain-ontology-validator'
+   in .cortex/skills/supply-chain-ontology-validator/SKILL.md.
+   The skill should validate referential integrity, canonical metric completeness,
+   and verified query coverage before deploying semantic models to stage."
+
+Skill Implemented:
+  - .cortex/skills/supply-chain-ontology-validator/SKILL.md
+  - .cortex/skills/supply-chain-ontology-validator/validate_model.py
+
+Checks Performed:
+  1. Referential Integrity (7/7 tables, 11/11 relationships)
+  2. Canonical Metrics Completeness (OTD, Fill Rate, DOI, Landed Cost)
+  3. Persona Coverage (Procurement, Logistics, Planning, Executive)
+  4. Type Safety & Guardrails (NULLIF division-by-zero checks)
+
+Validation Output:
+  [PASS] All 7 required tables declared in model
+  [PASS] 11/11 relationships reference valid tables with matching join columns
+  [PASS] Canonical Metrics: 4/4 verified
+  [PASS] Persona Queries: 14 verified queries mapped across 4 personas
+  RESULT: 100% COMPLIANT (Exit Code: 0)
+
+================================================================================
+7. STEP 6: DOCUMENT INTELLIGENCE — SLA CONTRACT PROCESSING (2026-09-29)
+================================================================================
+Prompt to CoCo:
+  "Create a supplier SLA contract document (contracts/supplier_sla_agreement.txt),
+   upload it to Snowflake, use SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b') to extract
+   structured SLA terms into SUPPLIER_CONTRACT_SLAS, and build a comparison view
+   joining SLA targets against actual OTD from FCT_PURCHASE_ORDERS."
+
+Artifacts Created:
+  - contracts/supplier_sla_agreement.txt  (6,441 bytes — unstructured SLA document)
+  - sql/05_document_parsing.sql           (DDL + extraction logic)
+  - CONTRACT_DOCUMENTS_STAGE              (internal stage for contract files)
+  - RAW_CONTRACT_DOCUMENTS                (raw text: 1 row, 6,441 chars)
+  - SUPPLIER_CONTRACT_SLAS                (20 rows extracted via Cortex AI)
+  - V_SLA_VS_ACTUAL_OTD                   (comparison view: SLA target vs actual OTD)
+
+Extraction Method:
+  SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b') + LATERAL FLATTEN on JSON output
+  20/20 suppliers parsed correctly with zero manual intervention.
+
+Semantic Model Update:
+  Added 2 verified queries (sla_vs_actual_otd, sla_breach_summary) to YAML.
+  Re-uploaded to @SEMANTIC_MODELS_STAGE (34,813 bytes).
+
+Streamlit App Update:
+  Added "Contract SLA vs Actual OTD (Document Intelligence)" expander section
+  with color-coded compliance table and summary metrics.
+
+================================================================================
+8. STEP 7: MCP CONNECTOR — SUPPLY CHAIN ALERTING (2026-09-29)
+================================================================================
+Prompt to CoCo:
+  "Build a lightweight MCP server with stdio transport that registers two tools:
+   check_otd_breach(supplier_id) and sla_compliance_report(). Register it in
+   ~/.snowflake/cortex/mcp.json so CoCo CLI can invoke it."
+
+Artifacts Created:
+  - mcp/supply_chain_mcp_server.py  (189 lines — MCP v2 server with 2 tools)
+  - mcp/mcp_config.json             (project-level MCP config)
+  - ~/.snowflake/cortex/mcp.json    (CoCo CLI global registration)
+
+Tools Implemented:
+  1. check_otd_breach(supplier_id) — Queries V_SLA_VS_ACTUAL_OTD, returns alert
+     payload with SLA target, actual OTD, gap, status, and escalation recommendation.
+  2. sla_compliance_report() — Returns executive summary with breach/warning/meeting
+     counts and top breaching + performing suppliers.
+
+Technology: MCP Python SDK v2.2.0, MCPServer with stdio transport.
+Testing: 3/3 tool invocations passed against live Snowflake data.
+

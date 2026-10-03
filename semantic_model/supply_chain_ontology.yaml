@@ -1,0 +1,925 @@
+name: supply_chain_ontology
+description: >
+  Enterprise Supply Chain Semantic Model for SUPPLY_CHAIN_DB.
+  Covers procurement, logistics, planning, and finance with
+  4 canonical metrics: OTD, Fill Rate, Days of Inventory, Landed Cost.
+
+tables:
+
+  # ─── DIMENSION: SUPPLIERS ───────────────────────────────────
+  - name: suppliers
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: DIM_SUPPLIER
+    primary_key:
+      columns:
+        - supplier_id
+    description: Supplier master data with country, lead time, and quality rating.
+    dimensions:
+      - name: supplier_id
+        expr: supplier_id
+        data_type: VARCHAR
+        description: Unique supplier identifier.
+        sample_values:
+          - SUP-001
+          - SUP-009
+          - SUP-017
+      - name: supplier_name
+        expr: supplier_name
+        data_type: VARCHAR
+        description: Legal name of the supplier.
+        synonyms:
+          - vendor name
+          - supplier
+      - name: country
+        expr: country
+        data_type: VARCHAR
+        description: Country where the supplier is headquartered.
+        sample_values:
+          - India
+          - UAE
+          - Germany
+          - USA
+          - China
+        synonyms:
+          - supplier country
+          - supplier_country
+          - vendor country
+      - name: lead_time_days
+        expr: lead_time_days
+        data_type: NUMBER
+        description: Contracted lead time in calendar days.
+      - name: rating
+        expr: rating
+        data_type: NUMBER
+        description: Supplier quality rating on a 1-5 scale.
+        synonyms:
+          - supplier rating
+          - supplier_rating
+          - quality rating
+
+  # ─── DIMENSION: PLANTS ─────────────────────────────────────
+  - name: plants
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: DIM_PLANT
+    primary_key:
+      columns:
+        - plant_id
+    description: Manufacturing and assembly plant locations.
+    dimensions:
+      - name: plant_id
+        expr: plant_id
+        data_type: VARCHAR
+        description: Unique plant identifier.
+        sample_values:
+          - PLT-001
+          - PLT-003
+          - PLT-005
+      - name: plant_name
+        expr: plant_name
+        data_type: VARCHAR
+        description: Name of the manufacturing plant.
+        synonyms:
+          - factory
+          - facility
+      - name: city
+        expr: city
+        data_type: VARCHAR
+        description: City where the plant is located.
+        sample_values:
+          - Dubai
+          - Abu Dhabi
+          - Mumbai
+          - Chennai
+          - Frankfurt
+        synonyms:
+          - plant city
+          - plant_city
+      - name: country
+        expr: country
+        data_type: VARCHAR
+        description: Country where the plant is located.
+        synonyms:
+          - plant country
+          - plant_country
+      - name: capacity_units
+        expr: capacity_units
+        data_type: NUMBER
+        description: Maximum annual production capacity in units.
+
+  # ─── DIMENSION: CUSTOMERS ──────────────────────────────────
+  - name: customers
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: DIM_CUSTOMER
+    primary_key:
+      columns:
+        - customer_id
+    description: Customer master data with industry and service tier.
+    dimensions:
+      - name: customer_id
+        expr: customer_id
+        data_type: VARCHAR
+        description: Unique customer identifier.
+        sample_values:
+          - CUST-001
+          - CUST-011
+          - CUST-016
+      - name: customer_name
+        expr: customer_name
+        data_type: VARCHAR
+        description: Legal name of the customer.
+        synonyms:
+          - client
+          - buyer
+      - name: industry
+        expr: industry
+        data_type: VARCHAR
+        description: Industry vertical of the customer.
+        sample_values:
+          - Automotive
+          - Oil & Gas
+          - Technology
+          - Aviation
+          - Telecom
+      - name: country
+        expr: country
+        data_type: VARCHAR
+        description: Country where the customer is headquartered.
+        synonyms:
+          - customer country
+          - customer_country
+      - name: tier
+        expr: tier
+        data_type: VARCHAR
+        description: Service tier assigned to the customer.
+        sample_values:
+          - Platinum
+          - Gold
+          - Silver
+        is_enum: true
+
+  # ─── DIMENSION: PARTS ──────────────────────────────────────
+  - name: parts
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: DIM_PART
+    primary_key:
+      columns:
+        - part_id
+    description: Part catalog with category, unit cost, and default supplier/plant.
+    dimensions:
+      - name: part_id
+        expr: part_id
+        data_type: VARCHAR
+        description: Unique part identifier.
+        sample_values:
+          - PRT-001
+          - PRT-010
+          - PRT-022
+      - name: part_name
+        expr: part_name
+        data_type: VARCHAR
+        description: Descriptive name of the part.
+        synonyms:
+          - component
+          - item
+      - name: category
+        expr: category
+        data_type: VARCHAR
+        description: Part category for classification.
+        sample_values:
+          - ELECTRONICS
+          - MECHANICAL
+          - PACKAGING
+          - RAW_MATERIAL
+        is_enum: true
+      - name: unit_cost
+        expr: unit_cost
+        data_type: NUMBER
+        description: Standard catalog unit cost of the part.
+        synonyms:
+          - catalog unit cost
+          - catalog_unit_cost
+          - part cost
+      - name: supplier_id
+        expr: supplier_id
+        data_type: VARCHAR
+        description: FK to the default supplier for this part.
+      - name: plant_id
+        expr: plant_id
+        data_type: VARCHAR
+        description: FK to the default plant for this part.
+
+  # ─── FACT: PURCHASE ORDERS ─────────────────────────────────
+  - name: purchase_orders
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: FCT_PURCHASE_ORDERS
+    primary_key:
+      columns:
+        - po_id
+    description: >
+      Inbound purchase orders from suppliers. Contains order and receipt quantities,
+      landed cost components (unit cost, freight, customs/tariff), promised vs actual
+      receipt dates, and PO status.
+    dimensions:
+      - name: po_id
+        expr: po_id
+        data_type: VARCHAR
+        description: Unique purchase order identifier.
+        synonyms:
+          - purchase order number
+          - PO number
+      - name: promised_date
+        expr: promised_date
+        data_type: DATE
+        description: Date the supplier promised to deliver.
+      - name: receipt_date
+        expr: receipt_date
+        data_type: DATE
+        description: Actual date goods were received at the plant.
+      - name: po_status
+        expr: po_status
+        data_type: VARCHAR
+        description: Current status of the purchase order.
+        sample_values:
+          - OPEN
+          - PARTIALLY_RECEIVED
+          - RECEIVED
+        is_enum: true
+      - name: part_id
+        expr: part_id
+        data_type: VARCHAR
+        description: FK to the part ordered.
+      - name: supplier_id
+        expr: supplier_id
+        data_type: VARCHAR
+        description: FK to the supplier for this PO.
+      - name: plant_id
+        expr: plant_id
+        data_type: VARCHAR
+        description: FK to the receiving plant.
+      - name: po_is_late
+        expr: "CASE WHEN receipt_date > promised_date THEN 'Late' ELSE 'On Time' END"
+        data_type: VARCHAR
+        description: Whether the PO was received after the promised date.
+        sample_values:
+          - Late
+          - On Time
+        is_enum: true
+    facts:
+      - name: order_qty
+        expr: order_qty
+        data_type: NUMBER
+        description: Quantity ordered from the supplier.
+      - name: received_qty
+        expr: received_qty
+        data_type: NUMBER
+        description: Quantity actually received at the plant.
+      - name: unit_cost_ea
+        expr: unit_cost_ea
+        data_type: NUMBER
+        description: Unit cost per item on this PO.
+      - name: freight_cost
+        expr: freight_cost
+        data_type: NUMBER
+        description: Total freight/shipping cost for this PO.
+      - name: customs_tariff_cost
+        expr: customs_tariff_cost
+        data_type: NUMBER
+        description: Total customs and tariff cost for this PO.
+      - name: po_line_value
+        expr: "order_qty * unit_cost_ea"
+        data_type: NUMBER
+        description: Total line value of the PO (qty x unit cost).
+      - name: po_landed_cost_per_unit
+        expr: "unit_cost_ea + (freight_cost / NULLIF(order_qty, 0)) + (customs_tariff_cost / NULLIF(order_qty, 0))"
+        data_type: NUMBER
+        description: Fully landed cost per unit including freight and customs.
+    metrics:
+      - name: supplier_otd_rate
+        expr: "ROUND(100.0 * SUM(CASE WHEN receipt_date <= promised_date THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN receipt_date IS NOT NULL THEN 1 END), 0), 2)"
+        description: >
+          Procurement Lens: Inbound Supplier On-Time Delivery rate.
+          Percentage of received POs where receipt_date <= promised_date.
+        synonyms:
+          - inbound OTD
+          - supplier on-time delivery
+          - procurement OTD
+      - name: po_fill_rate
+        expr: "ROUND(100.0 * SUM(received_qty) / NULLIF(SUM(order_qty), 0), 2)"
+        description: >
+          Fill Rate: Percentage of ordered quantity that was actually received.
+          SUM(received_qty) / SUM(order_qty).
+        synonyms:
+          - fill rate
+          - receipt fill rate
+          - order fulfillment rate
+      - name: avg_landed_cost
+        expr: "ROUND(AVG(unit_cost_ea + (freight_cost / NULLIF(order_qty, 0)) + (customs_tariff_cost / NULLIF(order_qty, 0))), 2)"
+        description: >
+          Landed Cost: Average fully-loaded cost per unit including
+          unit cost, freight per unit, and customs/tariff per unit.
+        synonyms:
+          - landed cost per unit
+          - total cost per unit
+          - average landed cost
+      - name: total_po_count
+        expr: "COUNT(po_id)"
+        description: Total number of purchase orders.
+      - name: total_po_value
+        expr: "SUM(order_qty * unit_cost_ea)"
+        description: Total monetary value of all purchase orders.
+      - name: late_po_count
+        expr: "SUM(CASE WHEN receipt_date > promised_date THEN 1 ELSE 0 END)"
+        description: Number of POs received after the promised date.
+
+  # ─── FACT: SHIPMENTS ───────────────────────────────────────
+  - name: shipments
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: FCT_SHIPMENTS
+    primary_key:
+      columns:
+        - ship_id
+    description: >
+      Carrier shipments between plants. Tracks ship date, estimated vs actual
+      delivery, carrier performance, and transit status.
+    dimensions:
+      - name: ship_id
+        expr: ship_id
+        data_type: VARCHAR
+        description: Unique shipment identifier.
+      - name: po_id
+        expr: po_id
+        data_type: VARCHAR
+        description: FK to the purchase order for this shipment.
+      - name: origin_plant_id
+        expr: origin_plant_id
+        data_type: VARCHAR
+        description: FK to the origin plant.
+      - name: dest_plant_id
+        expr: dest_plant_id
+        data_type: VARCHAR
+        description: FK to the destination plant.
+      - name: carrier_name
+        expr: carrier_name
+        data_type: VARCHAR
+        description: Name of the carrier or logistics provider.
+        synonyms:
+          - logistics provider
+          - shipping company
+        sample_values:
+          - Maersk
+          - DHL Logistics
+          - FedEx Freight
+          - Aramex
+          - Emirates SkyCargo
+      - name: ship_date
+        expr: ship_date
+        data_type: DATE
+        description: Date the shipment departed the origin plant.
+      - name: estimated_delivery_date
+        expr: estimated_delivery_date
+        data_type: DATE
+        description: Estimated arrival date at the destination plant.
+      - name: actual_delivery_date
+        expr: actual_delivery_date
+        data_type: DATE
+        description: Actual arrival date at the destination plant.
+      - name: transit_status
+        expr: transit_status
+        data_type: VARCHAR
+        description: Current transit status.
+        sample_values:
+          - IN_TRANSIT
+          - DELIVERED
+          - DELIVERED_LATE
+        is_enum: true
+      - name: shipment_is_late
+        expr: "CASE WHEN actual_delivery_date > estimated_delivery_date THEN 'Late' ELSE 'On Time' END"
+        data_type: VARCHAR
+        description: Whether the shipment arrived after the estimated delivery date.
+        sample_values:
+          - Late
+          - On Time
+        is_enum: true
+    facts:
+      - name: transit_days_actual
+        expr: "DATEDIFF('day', ship_date, actual_delivery_date)"
+        data_type: NUMBER
+        description: Actual number of transit days from ship to delivery.
+      - name: transit_days_planned
+        expr: "DATEDIFF('day', ship_date, estimated_delivery_date)"
+        data_type: NUMBER
+        description: Planned transit days based on estimate.
+      - name: transit_delay_days
+        expr: "DATEDIFF('day', estimated_delivery_date, actual_delivery_date)"
+        data_type: NUMBER
+        description: Number of days the shipment was late (negative = early).
+    metrics:
+      - name: carrier_otd_rate
+        expr: "ROUND(100.0 * SUM(CASE WHEN actual_delivery_date <= estimated_delivery_date THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN actual_delivery_date IS NOT NULL THEN 1 END), 0), 2)"
+        description: >
+          Logistics Lens: Carrier Transit On-Time Delivery rate.
+          Percentage of completed shipments where actual_delivery_date <= estimated_delivery_date.
+        synonyms:
+          - carrier OTD
+          - logistics OTD
+          - transit on-time rate
+      - name: total_shipment_count
+        expr: "COUNT(ship_id)"
+        description: Total number of shipments.
+      - name: avg_transit_days
+        expr: "ROUND(AVG(DATEDIFF('day', ship_date, actual_delivery_date)), 1)"
+        description: Average actual transit time in days.
+      - name: avg_delay_days
+        expr: "ROUND(AVG(CASE WHEN actual_delivery_date > estimated_delivery_date THEN DATEDIFF('day', estimated_delivery_date, actual_delivery_date) END), 1)"
+        description: Average delay in days for late shipments only.
+
+  # ─── FACT: CUSTOMER ORDERS ─────────────────────────────────
+  - name: customer_orders
+    base_table:
+      database: SUPPLY_CHAIN_DB
+      schema: ANALYTICS
+      table: FCT_CUSTOMER_ORDERS
+    primary_key:
+      columns:
+        - order_id
+    description: >
+      Outbound customer orders. Tracks ordered vs shipped quantities,
+      request vs shipped dates, and delivery status (OTIF tracking).
+    dimensions:
+      - name: order_id
+        expr: order_id
+        data_type: VARCHAR
+        description: Unique customer order identifier.
+        synonyms:
+          - sales order
+          - customer order number
+      - name: customer_id
+        expr: customer_id
+        data_type: VARCHAR
+        description: FK to the customer.
+      - name: part_id
+        expr: part_id
+        data_type: VARCHAR
+        description: FK to the part ordered.
+      - name: plant_id
+        expr: plant_id
+        data_type: VARCHAR
+        description: FK to the fulfilling plant.
+      - name: request_date
+        expr: request_date
+        data_type: DATE
+        description: Date the customer requested delivery.
+      - name: shipped_date
+        expr: shipped_date
+        data_type: DATE
+        description: Actual date the order was shipped to the customer.
+      - name: delivery_status
+        expr: delivery_status
+        data_type: VARCHAR
+        description: Current delivery status of the customer order.
+        sample_values:
+          - PENDING
+          - DELIVERED
+          - DELIVERED_LATE
+          - PARTIAL_FILL
+        is_enum: true
+    facts:
+      - name: ordered_qty
+        expr: ordered_qty
+        data_type: NUMBER
+        description: Quantity requested by the customer.
+      - name: shipped_qty
+        expr: shipped_qty
+        data_type: NUMBER
+        description: Quantity actually shipped to the customer.
+    metrics:
+      - name: customer_otif_rate
+        expr: "ROUND(100.0 * SUM(CASE WHEN shipped_date <= DATEADD('day', 5, request_date) AND shipped_qty >= ordered_qty THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN shipped_date IS NOT NULL THEN 1 END), 0), 2)"
+        description: >
+          Planning Lens: Customer On-Time In-Full (OTIF) rate.
+          Percentage of shipped orders where shipped_date <= request_date + 5 days
+          AND shipped_qty >= ordered_qty.
+        synonyms:
+          - customer OTIF
+          - customer on-time in-full
+          - planning OTD
+          - OTIF rate
+      - name: customer_fill_rate
+        expr: "ROUND(100.0 * SUM(shipped_qty) / NULLIF(SUM(ordered_qty), 0), 2)"
+        description: >
+          Customer order fill rate: percentage of ordered quantity shipped.
+        synonyms:
+          - outbound fill rate
+          - order fill rate
+      - name: total_customer_orders
+        expr: "COUNT(order_id)"
+        description: Total number of customer orders.
+      - name: late_customer_orders
+        expr: "SUM(CASE WHEN delivery_status = 'DELIVERED_LATE' THEN 1 ELSE 0 END)"
+        description: Number of customer orders delivered late.
+
+# ─── RELATIONSHIPS ─────────────────────────────────────────
+relationships:
+  - name: parts_to_suppliers
+    left_table: parts
+    right_table: suppliers
+    relationship_columns:
+      - left_column: supplier_id
+        right_column: supplier_id
+
+  - name: parts_to_plants
+    left_table: parts
+    right_table: plants
+    relationship_columns:
+      - left_column: plant_id
+        right_column: plant_id
+
+  - name: po_to_parts
+    left_table: purchase_orders
+    right_table: parts
+    relationship_columns:
+      - left_column: part_id
+        right_column: part_id
+
+  - name: po_to_suppliers
+    left_table: purchase_orders
+    right_table: suppliers
+    relationship_columns:
+      - left_column: supplier_id
+        right_column: supplier_id
+
+  - name: po_to_plants
+    left_table: purchase_orders
+    right_table: plants
+    relationship_columns:
+      - left_column: plant_id
+        right_column: plant_id
+
+  - name: shipments_to_po
+    left_table: shipments
+    right_table: purchase_orders
+    relationship_columns:
+      - left_column: po_id
+        right_column: po_id
+
+  - name: shipments_to_origin_plant
+    left_table: shipments
+    right_table: plants
+    relationship_columns:
+      - left_column: origin_plant_id
+        right_column: plant_id
+
+  - name: shipments_to_dest_plant
+    left_table: shipments
+    right_table: plants
+    relationship_columns:
+      - left_column: dest_plant_id
+        right_column: plant_id
+
+  - name: co_to_customers
+    left_table: customer_orders
+    right_table: customers
+    relationship_columns:
+      - left_column: customer_id
+        right_column: customer_id
+
+  - name: co_to_parts
+    left_table: customer_orders
+    right_table: parts
+    relationship_columns:
+      - left_column: part_id
+        right_column: part_id
+
+  - name: co_to_plants
+    left_table: customer_orders
+    right_table: plants
+    relationship_columns:
+      - left_column: plant_id
+        right_column: plant_id
+
+# ─── CANONICAL ENTERPRISE METRICS (derived / cross-table) ──
+metrics:
+  - name: enterprise_otd_rate
+    expr: >
+      ROUND(
+        (
+          (SELECT SUM(CASE WHEN receipt_date <= promised_date THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS WHERE receipt_date IS NOT NULL)
+          +
+          (SELECT SUM(CASE WHEN actual_delivery_date <= estimated_delivery_date THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_SHIPMENTS WHERE actual_delivery_date IS NOT NULL)
+          +
+          (SELECT SUM(CASE WHEN shipped_date <= DATEADD('day', 5, request_date) AND shipped_qty >= ordered_qty THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS WHERE shipped_date IS NOT NULL)
+        ) / NULLIF(
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS WHERE receipt_date IS NOT NULL)
+          +
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_SHIPMENTS WHERE actual_delivery_date IS NOT NULL)
+          +
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS WHERE shipped_date IS NOT NULL)
+        , 0) * 100, 2)
+    description: >
+      Canonical Enterprise OTD: Weighted average on-time rate across all delivery types
+      (supplier inbound, carrier transit, customer outbound).
+    synonyms:
+      - enterprise on-time delivery
+      - overall OTD
+      - company-wide OTD
+
+  - name: days_of_inventory
+    expr: >
+      ROUND(
+        (SELECT SUM(received_qty) - SUM(shipped_qty)
+         FROM (
+           SELECT COALESCE(SUM(received_qty), 0) AS received_qty, 0 AS shipped_qty
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS
+           UNION ALL
+           SELECT 0, COALESCE(SUM(shipped_qty), 0)
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS
+         ))::FLOAT
+        / NULLIF(
+          (SELECT SUM(ordered_qty)::FLOAT / 365
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS), 0)
+      , 1)
+    description: >
+      Days of Inventory (DOI): Estimated on-hand stock (received - shipped)
+      divided by average daily demand (annual customer demand / 365).
+    synonyms:
+      - DOI
+      - inventory days
+      - days on hand
+
+# ─── VERIFIED QUERIES ──────────────────────────────────────
+verified_queries:
+
+  - name: overall_supplier_otd
+    question: What is the overall supplier on-time delivery rate?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        ROUND(100.0 * SUM(CASE WHEN receipt_date <= promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN receipt_date IS NOT NULL THEN 1 END), 0), 2) AS supplier_otd_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS;
+
+  - name: supplier_otd_by_country
+    question: What is the supplier OTD rate broken down by supplier country?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        s.country AS supplier_country,
+        COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END) AS total_received,
+        ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2) AS otd_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_SUPPLIER s ON po.supplier_id = s.supplier_id
+      GROUP BY s.country
+      ORDER BY otd_pct DESC;
+
+  - name: carrier_otd_by_carrier
+    question: Which carrier has the best on-time delivery rate?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        carrier_name,
+        COUNT(CASE WHEN actual_delivery_date IS NOT NULL THEN 1 END) AS delivered,
+        ROUND(100.0 * SUM(CASE WHEN actual_delivery_date <= estimated_delivery_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN actual_delivery_date IS NOT NULL THEN 1 END), 0), 2) AS carrier_otd_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_SHIPMENTS
+      GROUP BY carrier_name
+      ORDER BY carrier_otd_pct DESC;
+
+  - name: customer_otif
+    question: What is the customer OTIF rate?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        ROUND(100.0 * SUM(CASE WHEN shipped_date <= DATEADD('day', 5, request_date)
+                               AND shipped_qty >= ordered_qty THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN shipped_date IS NOT NULL THEN 1 END), 0), 2) AS customer_otif_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS;
+
+  - name: customer_otif_by_tier
+    question: What is the customer OTIF rate by customer tier?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        c.tier,
+        COUNT(CASE WHEN co.shipped_date IS NOT NULL THEN 1 END) AS shipped_orders,
+        ROUND(100.0 * SUM(CASE WHEN co.shipped_date <= DATEADD('day', 5, co.request_date)
+                               AND co.shipped_qty >= co.ordered_qty THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN co.shipped_date IS NOT NULL THEN 1 END), 0), 2) AS otif_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS co
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_CUSTOMER c ON co.customer_id = c.customer_id
+      GROUP BY c.tier
+      ORDER BY otif_pct DESC;
+
+  - name: fill_rate_overall
+    question: What is the overall purchase order fill rate?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        ROUND(100.0 * SUM(received_qty) / NULLIF(SUM(order_qty), 0), 2) AS fill_rate_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS;
+
+  - name: fill_rate_by_category
+    question: What is the fill rate by part category?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        p.category,
+        ROUND(100.0 * SUM(po.received_qty) / NULLIF(SUM(po.order_qty), 0), 2) AS fill_rate_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_PART p ON po.part_id = p.part_id
+      GROUP BY p.category
+      ORDER BY fill_rate_pct DESC;
+
+  - name: avg_landed_cost_by_supplier
+    question: What is the average landed cost per unit by supplier?
+    verified_by: Finance Team
+    sql: >
+      SELECT
+        s.supplier_name,
+        s.country,
+        COUNT(po.po_id) AS po_count,
+        ROUND(AVG(po.unit_cost_ea
+                  + (po.freight_cost / NULLIF(po.order_qty, 0))
+                  + (po.customs_tariff_cost / NULLIF(po.order_qty, 0))), 2) AS avg_landed_cost
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_SUPPLIER s ON po.supplier_id = s.supplier_id
+      GROUP BY s.supplier_name, s.country
+      ORDER BY avg_landed_cost DESC;
+
+  - name: landed_cost_by_category
+    question: What is the average landed cost by part category?
+    verified_by: Finance Team
+    sql: >
+      SELECT
+        p.category,
+        ROUND(AVG(po.unit_cost_ea
+                  + (po.freight_cost / NULLIF(po.order_qty, 0))
+                  + (po.customs_tariff_cost / NULLIF(po.order_qty, 0))), 2) AS avg_landed_cost
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_PART p ON po.part_id = p.part_id
+      GROUP BY p.category
+      ORDER BY avg_landed_cost DESC;
+
+  - name: days_of_inventory_estimate
+    question: What are the estimated days of inventory?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        ROUND(
+          (SELECT COALESCE(SUM(received_qty), 0) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS)
+          -
+          (SELECT COALESCE(SUM(shipped_qty), 0) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS)
+        )::FLOAT
+        / NULLIF(
+          (SELECT SUM(ordered_qty)::FLOAT / 365 FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS)
+        , 0) AS days_of_inventory;
+
+  - name: top_late_suppliers
+    question: Which suppliers have the most late deliveries?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        s.supplier_name,
+        s.country,
+        SUM(CASE WHEN po.receipt_date > po.promised_date THEN 1 ELSE 0 END) AS late_pos,
+        COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END) AS total_received,
+        ROUND(100.0 * SUM(CASE WHEN po.receipt_date > po.promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2) AS late_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+      JOIN SUPPLY_CHAIN_DB.ANALYTICS.DIM_SUPPLIER s ON po.supplier_id = s.supplier_id
+      GROUP BY s.supplier_name, s.country
+      HAVING SUM(CASE WHEN po.receipt_date > po.promised_date THEN 1 ELSE 0 END) > 0
+      ORDER BY late_pos DESC
+      LIMIT 10;
+
+  - name: plant_volume_summary
+    question: How many purchase orders and customer orders does each plant handle?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        pl.plant_name,
+        pl.city,
+        (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+         WHERE po.plant_id = pl.plant_id) AS po_count,
+        (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS co
+         WHERE co.plant_id = pl.plant_id) AS co_count
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.DIM_PLANT pl
+      ORDER BY po_count DESC;
+
+  - name: enterprise_otd_summary
+    question: What is the overall enterprise on-time delivery rate across all channels?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        ROUND((
+          (SELECT SUM(CASE WHEN receipt_date <= promised_date THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS WHERE receipt_date IS NOT NULL)
+          +
+          (SELECT SUM(CASE WHEN actual_delivery_date <= estimated_delivery_date THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_SHIPMENTS WHERE actual_delivery_date IS NOT NULL)
+          +
+          (SELECT SUM(CASE WHEN shipped_date <= DATEADD('day', 5, request_date) AND shipped_qty >= ordered_qty THEN 1 ELSE 0 END)::FLOAT
+           FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS WHERE shipped_date IS NOT NULL)
+        ) / NULLIF(
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS WHERE receipt_date IS NOT NULL)
+          +
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_SHIPMENTS WHERE actual_delivery_date IS NOT NULL)
+          +
+          (SELECT COUNT(*) FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_CUSTOMER_ORDERS WHERE shipped_date IS NOT NULL)
+        , 0) * 100, 2) AS enterprise_otd_pct;
+
+  - name: monthly_po_trend
+    question: Show the monthly trend of purchase orders and late delivery count.
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        DATE_TRUNC('month', promised_date) AS month,
+        COUNT(*) AS total_pos,
+        SUM(CASE WHEN receipt_date > promised_date THEN 1 ELSE 0 END) AS late_pos,
+        ROUND(100.0 * SUM(CASE WHEN receipt_date <= promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN receipt_date IS NOT NULL THEN 1 END), 0), 2) AS otd_pct
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS
+      GROUP BY DATE_TRUNC('month', promised_date)
+      ORDER BY month;
+
+  - name: sla_vs_actual_otd
+    question: Which suppliers are breaching their contracted SLA OTD commitments?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        sla.supplier_id,
+        sla.supplier_name,
+        sla.country,
+        sla.otd_commitment_pct AS sla_target_pct,
+        ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2) AS actual_otd_pct,
+        COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END) AS total_closed_pos,
+        ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2)
+          - sla.otd_commitment_pct AS gap_pct,
+        CASE
+            WHEN ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2)
+                  >= sla.otd_commitment_pct THEN 'MEETING SLA'
+            WHEN ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2)
+                  >= sla.otd_commitment_pct - 3 THEN 'WARNING'
+            ELSE 'BREACH'
+        END AS sla_status,
+        sla.penalty_clause
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.SUPPLIER_CONTRACT_SLAS sla
+      LEFT JOIN SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+          ON sla.supplier_id = po.supplier_id
+      GROUP BY sla.supplier_id, sla.supplier_name, sla.country,
+               sla.otd_commitment_pct, sla.penalty_clause
+      ORDER BY gap_pct ASC;
+
+  - name: sla_breach_summary
+    question: How many suppliers are meeting, warning, or breaching their SLA targets?
+    verified_by: Supply Chain Analytics Team
+    sql: >
+      SELECT
+        CASE
+            WHEN ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2)
+                  >= sla.otd_commitment_pct THEN 'MEETING SLA'
+            WHEN ROUND(100.0 * SUM(CASE WHEN po.receipt_date <= po.promised_date THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(CASE WHEN po.receipt_date IS NOT NULL THEN 1 END), 0), 2)
+                  >= sla.otd_commitment_pct - 3 THEN 'WARNING'
+            ELSE 'BREACH'
+        END AS sla_status,
+        COUNT(*) AS supplier_count
+      FROM SUPPLY_CHAIN_DB.ANALYTICS.SUPPLIER_CONTRACT_SLAS sla
+      LEFT JOIN SUPPLY_CHAIN_DB.ANALYTICS.FCT_PURCHASE_ORDERS po
+          ON sla.supplier_id = po.supplier_id
+      GROUP BY sla.supplier_id, sla.supplier_name, sla.otd_commitment_pct
+      ORDER BY sla_status;
+
+# ─── CUSTOM INSTRUCTIONS ──────────────────────────────────
+custom_instructions: >
+  This semantic model covers a multi-echelon supply chain with procurement,
+  logistics, and customer fulfillment data. When answering questions about
+  "on-time delivery" or "OTD", always clarify which lens applies:
+  (1) Supplier/Procurement OTD from purchase_orders,
+  (2) Carrier/Logistics OTD from shipments,
+  (3) Customer/Planning OTIF from customer_orders, or
+  (4) Enterprise OTD which is the weighted average across all three.
+  For fill rate questions, distinguish between inbound (PO fill rate) and
+  outbound (customer order fill rate). Landed cost includes unit_cost_ea,
+  freight_cost per unit, and customs_tariff_cost per unit. Days of Inventory
+  is estimated from (total received - total shipped) / daily demand.

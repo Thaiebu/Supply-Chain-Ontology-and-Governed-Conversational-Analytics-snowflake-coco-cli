@@ -1,0 +1,21 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Keep .cortex skills and plans as hackathon evidence
+!.cortex/
+!.cortex/skills/
+!.cortex/skills/**
+!.cortex/plans/
+!.cortex/plans/**
+
+# Snowflake credentials
+credentials.json
+connections.toml

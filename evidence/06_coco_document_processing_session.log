@@ -1,0 +1,147 @@
+== CoCo Lifecycle Evidence Log: DOCUMENT / UNSTRUCTURED PROCESSING ==
+Phase: INGENUITY BONUS — Document Intelligence
+Session: coco_document_processing_session.log
+Date: 2026-09-29
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. OBJECTIVE
+================================================================================
+Demonstrate Snowflake Cortex AI document processing by:
+  1. Creating an unstructured supplier SLA contract document.
+  2. Using SNOWFLAKE.CORTEX.COMPLETE() to extract structured SLA terms.
+  3. Comparing contracted OTD targets vs actual delivery performance.
+
+This satisfies the hackathon requirement: "Document and unstructured processing:
+Parse, extract, and enrich documents with CoCo and combine them with structured
+data for richer answers."
+
+================================================================================
+2. CONTRACT DOCUMENT CREATION
+================================================================================
+File Created:
+  contracts/supplier_sla_agreement.txt (6,441 bytes, 194 lines)
+
+Document Contents:
+  - Master Supplier SLA for 20 contracted suppliers across 5 countries
+  - Each supplier entry contains: Supplier ID, Name, Country, OTD Commitment %,
+    Penalty Clause, and Contract Term dates
+  - Escalation protocol (3 levels: Warning, Corrective Action, Contract Review)
+  - Measurement methodology aligned with governed semantic model formula
+
+================================================================================
+3. DOCUMENT UPLOAD TO SNOWFLAKE STAGE
+================================================================================
+Command:
+  PUT file://contracts/supplier_sla_agreement.txt
+      @SUPPLY_CHAIN_DB.ANALYTICS.CONTRACT_DOCUMENTS_STAGE
+      AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+
+Result:
+  File: supplier_sla_agreement.txt
+  Status: UPLOADED
+  Source: 6,441 bytes
+  Encryption: SNOWFLAKE_SSE
+
+Raw Text Loaded Into:
+  SUPPLY_CHAIN_DB.ANALYTICS.RAW_CONTRACT_DOCUMENTS
+  Rows: 1 (doc_id='SLA-GCC-2026-001', text_length=6441)
+
+================================================================================
+4. CORTEX AI EXTRACTION (SNOWFLAKE.CORTEX.COMPLETE)
+================================================================================
+Prompt to CoCo:
+  "Use SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b') to extract all 20 supplier SLA
+   commitments from the raw contract text. Parse the unstructured document into
+   structured JSON with supplier_id, supplier_name, country, otd_commitment_pct,
+   penalty_clause, contract_start, and contract_end. Then LATERAL FLATTEN the
+   JSON array into the SUPPLIER_CONTRACT_SLAS table."
+
+Extraction SQL Core:
+  SNOWFLAKE.CORTEX.COMPLETE(
+    'llama3.1-70b',
+    'Extract ALL supplier SLA commitments from the following contract document.
+     Return ONLY a valid JSON array...'
+    || doc_text
+  )
+
+Result:
+  20 rows extracted and inserted into SUPPLY_CHAIN_DB.ANALYTICS.SUPPLIER_CONTRACT_SLAS
+  All supplier IDs, names, countries, OTD targets, penalties, and dates correctly parsed
+  Extraction method: SNOWFLAKE.CORTEX.COMPLETE(llama3.1-70b)
+  Zero manual data entry — fully automated AI extraction
+
+================================================================================
+5. SLA VS ACTUAL OTD COMPARISON (V_SLA_VS_ACTUAL_OTD)
+================================================================================
+View Created:
+  SUPPLY_CHAIN_DB.ANALYTICS.V_SLA_VS_ACTUAL_OTD
+
+Query:
+  Joins SUPPLIER_CONTRACT_SLAS (extracted SLA targets) with FCT_PURCHASE_ORDERS
+  (actual delivery data) to compute gap and SLA compliance status per supplier.
+
+Results (20 suppliers):
+  BREACH (actual < target - 3pts):   10 suppliers
+  WARNING (within 3pts of target):    4 suppliers
+  MEETING SLA (actual >= target):     6 suppliers
+
+Top SLA Breaches:
+  Siemens Industrial:     SLA 96% vs Actual 72.22% (gap: -23.78pts) — BREACH
+  Foxconn Components:     SLA 91% vs Actual 76.92% (gap: -14.08pts) — BREACH
+  Abu Dhabi Materials:    SLA 90% vs Actual 78.95% (gap: -11.05pts) — BREACH
+  Emirates Metal Works:   SLA 95% vs Actual 84.21% (gap: -10.79pts) — BREACH
+
+Top SLA Performers:
+  Reliance Components:    SLA 88% vs Actual 96.15% (gap: +8.15pts)  — MEETING SLA
+  Continental Parts AG:   SLA 93% vs Actual 100%   (gap: +7.00pts)  — MEETING SLA
+  Caterpillar Parts:      SLA 85% vs Actual 91.67% (gap: +6.67pts)  — MEETING SLA
+  Tata Steel Supply:      SLA 90% vs Actual 94.74% (gap: +4.74pts)  — MEETING SLA
+
+================================================================================
+6. SEMANTIC MODEL UPDATE
+================================================================================
+Added 2 verified queries to supply_chain_ontology.yaml:
+  1. sla_vs_actual_otd: "Which suppliers are breaching their contracted SLA OTD
+     commitments?" — Full SLA compliance report with gap analysis.
+  2. sla_breach_summary: "How many suppliers are meeting, warning, or breaching
+     their SLA targets?" — Aggregate compliance status counts.
+
+Updated YAML re-uploaded to @SEMANTIC_MODELS_STAGE (34,813 bytes).
+
+================================================================================
+7. STREAMLIT APP UPDATE
+================================================================================
+Added new expandable section to streamlit/app.py:
+  "Contract SLA vs Actual OTD (Document Intelligence)"
+  - Loads V_SLA_VS_ACTUAL_OTD view
+  - Shows summary metrics: Breach / Warning / Meeting SLA counts
+  - Color-coded table (red = breach, yellow = warning, green = meeting)
+  - Source attribution caption explaining Cortex AI extraction pipeline
+
+================================================================================
+8. ARTIFACTS CREATED
+================================================================================
+  contracts/supplier_sla_agreement.txt    — Source unstructured document
+  sql/05_document_parsing.sql             — DDL + extraction SQL
+  SUPPLY_CHAIN_DB.ANALYTICS tables:
+    - CONTRACT_DOCUMENTS_STAGE            — Internal stage for contract files
+    - RAW_CONTRACT_DOCUMENTS              — Raw text storage (1 row)
+    - SUPPLIER_CONTRACT_SLAS              — Extracted SLA terms (20 rows)
+    - V_SLA_VS_ACTUAL_OTD                 — Comparison view (20 rows)
+  semantic_model/supply_chain_ontology.yaml — Updated with 2 new verified queries
+  streamlit/app.py                         — Updated with SLA compliance section
+
+================================================================================
+CONCLUSION
+================================================================================
+This demonstrates end-to-end document intelligence:
+  Unstructured contract text
+    -> Cortex AI extraction (SNOWFLAKE.CORTEX.COMPLETE)
+      -> Structured Snowflake table
+        -> Joined with governed operational data
+          -> Actionable SLA compliance insights in Streamlit
+
+The same pipeline pattern can be applied to any supplier contract, RFQ document,
+or compliance agreement — making it a reusable pattern for enterprise procurement.

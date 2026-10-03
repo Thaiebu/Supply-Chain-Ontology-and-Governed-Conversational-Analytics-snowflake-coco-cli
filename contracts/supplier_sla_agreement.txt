@@ -1,0 +1,193 @@
+================================================================================
+MASTER SUPPLIER SERVICE LEVEL AGREEMENT (SLA)
+Effective Date: January 1, 2026
+Governing Entity: Global Supply Chain Operations, GCC Division
+Document ID: SLA-GCC-2026-001
+================================================================================
+
+SECTION 1: PURPOSE AND SCOPE
+
+This Master Supplier SLA defines the committed on-time delivery (OTD) performance
+targets for all contracted suppliers providing materials to our manufacturing
+plants across UAE, India, and Germany. Failure to meet the committed OTD target
+for two consecutive quarters triggers a Corrective Action Plan (CAP) and potential
+contract renegotiation.
+
+SECTION 2: SUPPLIER OTD COMMITMENTS
+
+The following suppliers have agreed to the stated on-time delivery commitment
+as a condition of their supply agreement. OTD is measured as:
+  (Purchase Orders where Receipt Date <= Promised Date) / (Total Closed POs)
+
+Supplier: Tata Steel Supply
+  Supplier ID: SUP-001
+  Country: India
+  OTD Commitment: 90%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: Reliance Components
+  Supplier ID: SUP-002
+  Country: India
+  OTD Commitment: 88%
+  Penalty Clause: 1.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2026
+
+Supplier: Mahindra Parts Co
+  Supplier ID: SUP-003
+  Country: India
+  OTD Commitment: 85%
+  Penalty Clause: 1% invoice reduction per percentage point below target
+  Contract Term: Mar 2026 - Feb 2027
+
+Supplier: Bharat Electronics
+  Supplier ID: SUP-004
+  Country: India
+  OTD Commitment: 87%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: Emirates Metal Works
+  Supplier ID: SUP-005
+  Country: UAE
+  OTD Commitment: 95%
+  Penalty Clause: 3% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: Dubai Precision Parts
+  Supplier ID: SUP-006
+  Country: UAE
+  OTD Commitment: 93%
+  Penalty Clause: 2.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2026
+
+Supplier: Gulf Logistics Supply
+  Supplier ID: SUP-007
+  Country: UAE
+  OTD Commitment: 88%
+  Penalty Clause: 1.5% invoice reduction per percentage point below target
+  Contract Term: Apr 2026 - Mar 2027
+
+Supplier: Abu Dhabi Materials
+  Supplier ID: SUP-008
+  Country: UAE
+  OTD Commitment: 90%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: Siemens Industrial
+  Supplier ID: SUP-009
+  Country: Germany
+  OTD Commitment: 96%
+  Penalty Clause: 3% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2028
+
+Supplier: Bosch Components
+  Supplier ID: SUP-010
+  Country: Germany
+  OTD Commitment: 95%
+  Penalty Clause: 3% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: ThyssenKrupp Supply
+  Supplier ID: SUP-011
+  Country: Germany
+  OTD Commitment: 92%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jun 2026 - May 2028
+
+Supplier: Continental Parts AG
+  Supplier ID: SUP-012
+  Country: Germany
+  OTD Commitment: 93%
+  Penalty Clause: 2.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: GE Supply Chain
+  Supplier ID: SUP-013
+  Country: USA
+  OTD Commitment: 90%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2026
+
+Supplier: Honeywell Materials
+  Supplier ID: SUP-014
+  Country: USA
+  OTD Commitment: 92%
+  Penalty Clause: 2.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: 3M Industrial Supply
+  Supplier ID: SUP-015
+  Country: USA
+  OTD Commitment: 89%
+  Penalty Clause: 1.5% invoice reduction per percentage point below target
+  Contract Term: Feb 2026 - Jan 2027
+
+Supplier: Caterpillar Parts
+  Supplier ID: SUP-016
+  Country: USA
+  OTD Commitment: 85%
+  Penalty Clause: 1% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2026
+
+Supplier: Foxconn Components
+  Supplier ID: SUP-017
+  Country: China
+  OTD Commitment: 91%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+Supplier: BYD Supply Co
+  Supplier ID: SUP-018
+  Country: China
+  OTD Commitment: 90%
+  Penalty Clause: 2% invoice reduction per percentage point below target
+  Contract Term: Mar 2026 - Feb 2028
+
+Supplier: Huawei Industrial
+  Supplier ID: SUP-019
+  Country: China
+  OTD Commitment: 88%
+  Penalty Clause: 1.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2026
+
+Supplier: CRRC Materials
+  Supplier ID: SUP-020
+  Country: China
+  OTD Commitment: 87%
+  Penalty Clause: 1.5% invoice reduction per percentage point below target
+  Contract Term: Jan 2026 - Dec 2027
+
+SECTION 3: ESCALATION PROTOCOL
+
+Level 1 (Warning): Supplier misses OTD target by 1-3 percentage points in a quarter.
+  Action: Written notice to supplier account manager.
+
+Level 2 (Corrective Action): Supplier misses OTD target by >3 points OR misses
+  target for 2 consecutive quarters.
+  Action: Mandatory root cause analysis within 10 business days. Corrective Action
+  Plan (CAP) submitted within 30 days.
+
+Level 3 (Contract Review): Supplier fails to meet CAP milestones OR misses target
+  for 3 consecutive quarters.
+  Action: Contract renegotiation or alternate supplier sourcing initiated.
+
+SECTION 4: MEASUREMENT AND REPORTING
+
+OTD performance is calculated monthly using data from the SUPPLY_CHAIN_DB system.
+Reports are distributed to Procurement, Logistics, and Executive stakeholders on
+the 5th business day of each month. The canonical formula is:
+
+  Supplier OTD % = COUNT(POs where receipt_date <= promised_date)
+                   / COUNT(All closed POs with receipt_date IS NOT NULL) * 100
+
+This formula aligns with the governed semantic model deployed in the enterprise
+Cortex Analyst system to ensure consistency across all reporting surfaces.
+
+================================================================================
+SIGNATORIES
+  VP Procurement: [Authorized]
+  VP Supply Chain: [Authorized]
+  Date: December 15, 2025
+================================================================================

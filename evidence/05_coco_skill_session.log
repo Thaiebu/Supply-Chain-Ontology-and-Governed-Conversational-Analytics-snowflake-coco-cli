@@ -1,0 +1,105 @@
+== CoCo Lifecycle Evidence Log: REUSABLE SKILL (HEADLINE BONUS) ==
+Phase: HEADLINE BONUS / EXTENSIBILITY
+Session: coco_skill_session.log
+Date: 2026-09-28 (initial), 2026-09-29 (verified with deployed objects)
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. OBJECTIVE & PROMPT
+================================================================================
+Objective:
+  Author a reusable, shareable custom CoCo skill that other engineering teams can
+  use to automatically validate supply chain ontologies and Cortex Analyst semantic
+  models against Snowflake data schemas before deployment.
+
+Prompt to CoCo:
+  "Create a reusable custom CoCo skill called 'supply-chain-ontology-validator'
+   in .cortex/skills/supply-chain-ontology-validator/SKILL.md.
+   The SKILL.md should:
+   1. Accept a semantic model YAML as input.
+   2. Check that it has relationships defined between all referenced tables.
+   3. Verify that all 4 canonical metrics (OTD, Fill Rate, DOI, Landed Cost) exist.
+   4. Confirm persona-specific verified queries exist.
+   5. Check for NULLIF division-by-zero protection.
+   6. Provide a companion Python validation script and output a compliance report."
+
+================================================================================
+2. SKILL ARTIFACTS CREATED
+================================================================================
+1. Skill Specification:
+   .cortex/skills/supply-chain-ontology-validator/SKILL.md
+   - Name: supply-chain-ontology-validator
+   - YAML Frontmatter:
+       name: supply-chain-ontology-validator
+       description: Validates Snowflake supply chain semantic models against
+         physical schema foreign keys, canonical metric completeness, and
+         verified query coverage.
+       usage: Run companion script before deploying semantic model YAML to stage.
+
+2. Execution Engine:
+   .cortex/skills/supply-chain-ontology-validator/validate_model.py
+   - CLI flags: --model, --database, --schema
+   - Exit code 0 = PASS, exit code 1 = FAIL
+
+================================================================================
+3. VALIDATION CHECKS IMPLEMENTED
+================================================================================
+Check 1: Referential Integrity
+  - Verifies all 7 required tables are declared (suppliers, plants, customers,
+    parts, purchase_orders, shipments, customer_orders).
+  - Verifies all 11 relationships reference valid tables and that join columns
+    exist as declared dimensions in their respective tables.
+
+Check 2: Canonical KPI Completeness
+  - OTD (On-Time Delivery): supplier_otd_rate, carrier_otd_rate,
+    customer_otif_rate, enterprise_otd_rate.
+  - Fill Rate: po_fill_rate, customer_fill_rate.
+  - Days of Inventory: days_of_inventory top-level metric.
+  - Landed Cost: po_landed_cost_per_unit, avg_landed_cost.
+
+Check 3: Persona Verified Query Coverage
+  - Procurement: 11 verified queries (supplier OTD, landed cost, PO trends).
+  - Logistics: 6 verified queries (carrier OTD, transit delays, routes).
+  - Planning: 5 verified queries (customer OTIF, fill rate, inventory).
+  - Executive: 3 verified queries (enterprise OTD, blended metrics).
+
+Check 4: Type Safety Guardrails
+  - All ratio/percentage measures checked for NULLIF division guards.
+  - Prevents integer division truncation (the 0.0% hallucination bug).
+
+================================================================================
+4. VALIDATION EXECUTION
+================================================================================
+Command:
+  python3 .cortex/skills/supply-chain-ontology-validator/validate_model.py \
+      --model semantic_model/supply_chain_ontology.yaml \
+      --database SUPPLY_CHAIN_DB --schema ANALYTICS
+
+Output:
+  [INFO] Loading semantic model: semantic_model/supply_chain_ontology.yaml
+  [INFO] Target: SUPPLY_CHAIN_DB.ANALYTICS
+
+  === 1. REFERENTIAL INTEGRITY ===
+  [PASS] All 7 required tables declared in model
+  [PASS] 11/11 relationships reference valid tables with matching join columns
+
+  === 2. CANONICAL KPI COMPLETENESS ===
+  [PASS] OTD metric found
+  [PASS] Fill Rate metric found
+  [PASS] Days of Inventory metric found
+  [PASS] Landed Cost metric found
+
+  === 3. PERSONA QUERY COVERAGE ===
+  [PASS] Procurement: 11 verified queries
+  [PASS] Logistics: 6 verified queries
+  [PASS] Planning: 5 verified queries
+  [PASS] Executive: 3 verified queries
+
+  === 4. TYPE SAFETY GUARDRAILS ===
+  [PASS] All ratio measures use NULLIF division guards
+
+  =======================================================
+  RESULT: PASS — Model is compliant and ready for deployment.
+  =======================================================
+  EXIT CODE: 0

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "supply-chain-alerts": {
+      "command": "python3",
+      "args": [
+        "/Users/mohamedthaiebu/Documents/Hackskill-hackethon/Snowflake_coco_cli/mcp/supply_chain_mcp_server.py"
+      ],
+      "env": {
+        "SNOWFLAKE_DEFAULT_CONNECTION_NAME": "WZ37797"
+      }
+    }
+  }
+}

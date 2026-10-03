@@ -1,0 +1,178 @@
+== CoCo Lifecycle Evidence Log: MCP CONNECTOR (INGENUITY BONUS) ==
+Phase: INGENUITY BONUS — MCP External Tool Integration
+Session: coco_mcp_session.log
+Date: 2026-09-29
+Connection: WZ37797 (Snowflake)
+CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+1. OBJECTIVE
+================================================================================
+Demonstrate MCP (Model Context Protocol) integration by building a lightweight
+MCP server that exposes supply chain OTD breach detection as tools invokable
+from CoCo CLI. This turns read-only analytics into actionable alerting.
+
+This satisfies the hackathon requirement: "Connecting to additional sources via
+MCP: Wire in external systems and tools through MCP so the agent can read from
+and act across those tools" and "MCP connectors to external tools: Extend the
+solution by connecting CoCo to additional data sources and tools through MCP."
+
+================================================================================
+2. MCP SERVER IMPLEMENTATION
+================================================================================
+File Created:
+  mcp/supply_chain_mcp_server.py (189 lines)
+
+Technology:
+  - MCP Python SDK v2.2.0 (MCPServer with stdio transport)
+  - snowflake-connector-python 4.7.5
+  - Connection via ~/.snowflake/connections.toml
+
+Tools Registered:
+  1. check_otd_breach(supplier_id: str)
+     - Queries V_SLA_VS_ACTUAL_OTD for a specific supplier
+     - Returns alert payload with SLA target, actual OTD, gap, status
+     - Includes escalation recommendation based on breach severity
+     - Alert levels: CRITICAL (breach), WARNING (within 3pts), OK (meeting)
+
+  2. sla_compliance_report()
+     - Returns full SLA compliance summary across all 20 suppliers
+     - Includes breach/warning/meeting counts
+     - Top 5 breaching suppliers with gap analysis
+     - Top 3 performing suppliers
+
+================================================================================
+3. MCP CONFIGURATION
+================================================================================
+Project Config:
+  mcp/mcp_config.json
+
+CoCo CLI Global Config:
+  ~/.snowflake/cortex/mcp.json
+
+Configuration:
+  {
+    "mcpServers": {
+      "supply-chain-alerts": {
+        "command": "<venv>/python3",
+        "args": ["<project>/mcp/supply_chain_mcp_server.py"],
+        "env": { "SNOWFLAKE_DEFAULT_CONNECTION_NAME": "WZ37797" }
+      }
+    }
+  }
+
+Transport: stdio (standard MCP transport for CoCo CLI)
+
+================================================================================
+4. TOOL TESTING — check_otd_breach
+================================================================================
+Test 1: Breaching Supplier (SUP-009 / Siemens Industrial)
+Command (via CoCo):
+  "Check OTD breach for supplier SUP-009"
+
+Result:
+  {
+    "supplier_id": "SUP-009",
+    "supplier_name": "Siemens Industrial",
+    "country": "Germany",
+    "sla_target_pct": 96.0,
+    "actual_otd_pct": 72.22,
+    "gap_pct": -23.78,
+    "total_closed_pos": 18,
+    "sla_status": "BREACH",
+    "alert_level": "CRITICAL",
+    "recommendation": "Siemens Industrial is 23.8 points below their 96% SLA
+      target. Escalation Level 2 triggered: Corrective Action Plan required
+      within 30 days. Penalty applies: 3% invoice reduction per percentage
+      point below target."
+  }
+Verdict: PASS — Correctly identified BREACH with escalation guidance.
+
+--------------------------------------------------------------------------------
+Test 2: Compliant Supplier (SUP-001 / Tata Steel Supply)
+Command (via CoCo):
+  "Check OTD breach for supplier SUP-001"
+
+Result:
+  {
+    "supplier_id": "SUP-001",
+    "supplier_name": "Tata Steel Supply",
+    "country": "India",
+    "sla_target_pct": 90.0,
+    "actual_otd_pct": 94.74,
+    "gap_pct": 4.74,
+    "total_closed_pos": 19,
+    "sla_status": "MEETING SLA",
+    "alert_level": "OK",
+    "recommendation": "Tata Steel Supply is meeting their SLA commitment
+      (94.7% vs 90% target)."
+  }
+Verdict: PASS — Correctly identified as MEETING SLA.
+
+================================================================================
+5. TOOL TESTING — sla_compliance_report
+================================================================================
+Command (via CoCo):
+  "Give me the full SLA compliance report"
+
+Result:
+  {
+    "report_title": "Supplier SLA Compliance Report",
+    "total_suppliers": 20,
+    "summary": {
+      "breach": 10,
+      "warning": 4,
+      "meeting_sla": 6
+    },
+    "top_breaches": [
+      {"supplier": "Siemens Industrial",   "gap": -23.78},
+      {"supplier": "Foxconn Components",    "gap": -14.08},
+      {"supplier": "Abu Dhabi Materials",   "gap": -11.05},
+      {"supplier": "Emirates Metal Works",  "gap": -10.79},
+      {"supplier": "Gulf Logistics Supply", "gap": -9.74}
+    ],
+    "top_performers": [
+      {"supplier": "Reliance Components",  "gap": +8.15},
+      {"supplier": "Continental Parts AG", "gap": +7.00},
+      {"supplier": "Caterpillar Parts",    "gap": +6.67}
+    ]
+  }
+Verdict: PASS — Full compliance report with correct counts and rankings.
+
+================================================================================
+6. COCO CLI INVOCATION
+================================================================================
+CoCo CLI Integration:
+  When CoCo CLI is launched with MCP enabled (via ~/.snowflake/cortex/mcp.json),
+  the supply-chain-alerts server starts automatically as a stdio subprocess.
+
+  CoCo recognizes the tools and can invoke them via natural language:
+    User: "Check if Siemens Industrial is breaching their delivery SLA"
+    CoCo: [calls check_otd_breach("SUP-009")] -> Returns CRITICAL alert
+
+  This enables conversational supply chain monitoring directly in the terminal:
+    User: "Which suppliers need corrective action plans?"
+    CoCo: [calls sla_compliance_report()] -> Returns breach list with recommendations
+
+Launch Command:
+  cortex --mcp  (or just 'cortex' if mcp.json is in ~/.snowflake/cortex/)
+
+================================================================================
+7. ARTIFACTS CREATED
+================================================================================
+  mcp/supply_chain_mcp_server.py       — MCP server with 2 tools (189 lines)
+  mcp/mcp_config.json                  — Project-level MCP configuration
+  ~/.snowflake/cortex/mcp.json         — CoCo CLI global MCP registration
+
+================================================================================
+CONCLUSION
+================================================================================
+The MCP connector transforms the governed supply chain analytics from a
+query-only system into an actionable alerting platform. CoCo CLI users can now:
+  1. Check individual supplier SLA compliance via natural language
+  2. Get executive-level compliance reports on demand
+  3. Receive escalation recommendations with penalty clause details
+
+This demonstrates the hackathon's MCP requirement: connecting CoCo to an external
+tool that reads from Snowflake data and provides actionable intelligence beyond
+simple text-to-SQL queries.
