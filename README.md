@@ -308,9 +308,34 @@ python3 .cortex/skills/supply-chain-ontology-validator/validate_model.py \
     --database SUPPLY_CHAIN_DB --schema ANALYTICS
 ```
 
+### How This Differs from `ontology-stack-builder`
+
+The Snowflake-Labs [`ontology-stack-builder`](https://github.com/Snowflake-Labs/coco-skills/tree/main/skills/ontology-stack-builder) skill **builds** a 5-layer ontology stack from scratch — it generates abstract views, metadata tables, semantic views, and a Cortex Agent from a relational schema or OWL file via a 7-phase guided workflow.
+
+Our `supply-chain-ontology-validator` does the opposite: it **validates** an already-authored semantic model before deployment. The two skills are complementary, not competing:
+
+| | `ontology-stack-builder` | `supply-chain-ontology-validator` |
+|---|---|---|
+| **Purpose** | Build an ontology from scratch | Validate an existing ontology before deploy |
+| **Phase** | Design-time (generation) | Pre-deploy (quality gate) |
+| **Input** | Relational schema or OWL file | Semantic model YAML |
+| **Output** | 5-layer stack (views, metadata, agent) | Pass/fail compliance report |
+| **Domain** | General-purpose (any schema) | Supply-chain-specific (enforces canonical KPIs) |
+| **Checks** | N/A (it generates, doesn't validate) | Referential integrity, KPI completeness, persona query coverage, division-by-zero guards |
+| **Use case** | "I have tables, build me an ontology" | "I have a semantic model, is it safe to deploy?" |
+
+In a production workflow, you would use `ontology-stack-builder` to generate the initial stack, then run `supply-chain-ontology-validator` as a CI/CD gate to ensure the model meets enterprise standards before it reaches business users.
+
 ---
 
-## 10. How to Run Locally
+## 10. Live Demo
+
+**Production Streamlit App (Snowflake):**
+[https://app.snowflake.com/CLCQQNE/wz37797/#/streamlit-apps/SUPPLY_CHAIN_DB.ANALYTICS.SUPPLY_CHAIN_PORTAL](https://app.snowflake.com/CLCQQNE/wz37797/#/streamlit-apps/SUPPLY_CHAIN_DB.ANALYTICS.SUPPLY_CHAIN_PORTAL)
+
+---
+
+## 11. How to Run Locally
 
 ### Prerequisites
 * Python 3.10+
