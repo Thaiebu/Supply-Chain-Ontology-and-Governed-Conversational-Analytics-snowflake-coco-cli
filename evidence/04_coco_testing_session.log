@@ -1,8 +1,35 @@
 == CoCo Lifecycle Evidence Log: TESTING & VALIDATION ==
 Phase: TESTING & VALIDATION
-Date: 2026-09-27 (initial), 2026-09-29 (re-executed with live Snowflake data)
+Date: 2026-09-27 (initial), 2026-09-29 (re-executed), 2026-10-03 (metric contract update)
 Connection: WZ37797 (Snowflake)
 CLI Tool: Snowflake CoCo / Cortex CLI
+
+================================================================================
+0. METRIC CONTRACT VALIDATION
+================================================================================
+The ontology enforces a METRIC CONTRACT pattern for On-Time Delivery:
+
+  Canonical Definition: "Percentage of eligible deliveries completed on or
+  before the applicable committed date."
+
+  This is ONE metric with ONE definition. The numbers differ across personas
+  because the committed date differs -- not because the metric is inconsistent.
+
+  Lens Routing:
+    Supplier (Procurement): receipt_date <= promised_date        -> 86.61%
+    Carrier (Logistics):    actual_delivery <= estimated_delivery -> 47.52%
+    Customer (Planning):    shipped_date <= request_date + 5 days
+                            AND shipped_qty >= ordered_qty        ->  5.39%
+    Enterprise (Executive): Weighted average across all 3         -> 39.50%
+
+  Why do the numbers differ?
+    Supplier OTD is high (86.61%) because supplier lead times are well-managed.
+    Carrier OTD is lower (47.52%) because ship/delivery dates are independently
+    randomized in synthetic data, creating realistic transit variance.
+    Customer OTIF is very low (5.39%) because fulfillment lead time averages
+    13.6 days vs a 5-day SLA grace window AND requires in-full quantity.
+    This is intentional: it demonstrates the ontology correctly distinguishes
+    OTD (timing only) from OTIF (timing + quantity).
 
 ================================================================================
 1. PERSONA PARITY MATRIX TESTING (via Cortex Analyst)

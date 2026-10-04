@@ -174,7 +174,7 @@ erDiagram
 ## 4. Understanding the Data & Why We Transform It to an Ontology
 
 ### 4.1 What the Data Represents
-The database models an end-to-end global manufacturing supply chain with **1,920 referentially consistent rows**:
+The database models an end-to-end global manufacturing supply chain with **1,980 referentially consistent rows**:
 1. **Upstream Procurement (`DIM_SUPPLIER`, `DIM_PART`, `FCT_PURCHASE_ORDERS`)**: 20 tier-1 suppliers across 5 countries fulfilling 500 purchase orders with granular unit costs, freight tariffs, promised dates, and dock receipt timestamps.
 2. **Midstream Logistics (`DIM_PLANT`, `FCT_SHIPMENTS`)**: 5 manufacturing hubs connected through 600 multi-modal freight shipments with carrier transit tracking (estimated vs. actual arrival).
 3. **Downstream Customer Fulfillment (`DIM_CUSTOMER`, `FCT_CUSTOMER_ORDERS`)**: 800 sales orders fulfilled to 20 enterprise customers across tiered service levels (`Platinum`, `Gold`, `Silver`).
@@ -222,15 +222,38 @@ Without an ontology, text-to-SQL models will hallucinate non-existent tables or 
 
 ## 6. Persona Parity Demonstration
 
-Cortex Analyst deterministically maps natural language questions according to the active business persona:
+### The Metric Contract Pattern
 
-| Persona | Natural Language Question | Resolved Metric Lens | Governed Value |
+OTD is **ONE canonical metric** with **ONE definition**: *"Percentage of eligible deliveries completed on or before the applicable committed date."* The numbers differ across personas because the **committed date** differs -- not because the metric is inconsistent.
+
+```
+                     METRIC CONTRACT: OTD
+                     "actual <= committed"
+                           |
+              +------------+------------+
+              |            |            |
+          Supplier      Carrier     Customer
+        receipt_date  actual_deliv  shipped_date
+           <=            <=            <=
+        promised_date est_deliv    request_date+5
+              |            |      + qty check (OTIF)
+              +------------+------------+
+                           |
+                     ENTERPRISE OTD
+                   (weighted average)
+```
+
+Cortex Analyst deterministically maps natural language questions to the correct lens:
+
+| Persona | Natural Language Question | Resolved Lens | Governed Value |
 |---|---|---|---|
-| 📦 **Procurement Manager** | *"What is our inbound supplier on-time delivery rate?"* | Inbound Supplier OTD (`FCT_PURCHASE_ORDERS`) | **86.61%** |
+| 📦 **Procurement Manager** | *"What is our inbound supplier on-time delivery rate?"* | Supplier OTD (`FCT_PURCHASE_ORDERS`) | **86.61%** |
 | 🚚 **Logistics Director** | *"What is our carrier transit on-time delivery rate?"* | Carrier Transit OTD (`FCT_SHIPMENTS`) | **47.52%** |
-| 📊 **Supply Chain Planner** | *"What is our customer OTIF rate?"* | Customer OTIF (`FCT_CUSTOMER_ORDERS`) | **8.14%** (Platinum) |
-| 💰 **Finance Manager** | *"What is the average landed cost per unit by supplier?"* | Average Landed Cost (`FCT_PURCHASE_ORDERS`) | **$214.78** (Bosch) |
+| 📊 **Supply Chain Planner** | *"What is our customer OTIF rate?"* | Customer OTIF (`FCT_CUSTOMER_ORDERS`) | **5.39%** |
+| 💰 **Finance Manager** | *"What is the average landed cost per unit by supplier?"* | Average Landed Cost (`FCT_PURCHASE_ORDERS`) | **$229.43** (Bosch) |
 | 👔 **VP Executive** | *"What is our canonical enterprise OTD rate across all channels?"* | Blended 3-channel Enterprise OTD | **39.50%** |
+
+> **Why do the numbers differ?** Because the committed dates differ. Supplier OTD measures receipt vs. PO promised date. Carrier OTD measures delivery vs. shipment ETA. Customer OTIF measures shipped date vs. customer request date *plus* quantity fulfillment. The **definition** (actual <= committed) is identical -- the **context** changes. This is precisely what the ontology governs.
 
 ### The Ungoverned Contrast
 When the VP Executive asks *"What is our on-time delivery rate?"* in **Ungoverned Mode** (raw LLM Text-to-SQL):

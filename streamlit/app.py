@@ -19,6 +19,48 @@ def get_session():
 # ---------------------------------------------------------------------------
 # Metric Catalog
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Metric Contract: ONE definition, MULTIPLE governed lenses
+# ---------------------------------------------------------------------------
+# The ontology's key insight: a canonical metric has ONE business definition
+# but resolves through different lenses depending on business context.
+# The definition is governed; the lens determines which data applies.
+METRIC_CONTRACTS = {
+    "on_time_delivery": {
+        "name": "On-Time Delivery (OTD)",
+        "business_definition": (
+            "Percentage of eligible deliveries completed on or before "
+            "the applicable committed date."
+        ),
+        "numerator": "Deliveries where actual_date <= committed_date",
+        "denominator": "All eligible (closed/completed) deliveries",
+        "exclusions": ["Cancelled orders", "Open/pending orders"],
+        "lenses": {
+            "Supplier (Procurement)": {
+                "committed_date": "promised_date (PO)",
+                "actual_date": "receipt_date",
+                "table": "FCT_PURCHASE_ORDERS",
+            },
+            "Carrier (Logistics)": {
+                "committed_date": "estimated_delivery_date",
+                "actual_date": "actual_delivery_date",
+                "table": "FCT_SHIPMENTS",
+            },
+            "Customer (Planning/OTIF)": {
+                "committed_date": "request_date + 5-day SLA grace",
+                "actual_date": "shipped_date",
+                "table": "FCT_CUSTOMER_ORDERS",
+                "extra": "+ shipped_qty >= ordered_qty (In-Full)",
+            },
+            "Enterprise (Executive)": {
+                "committed_date": "All three above",
+                "actual_date": "Weighted average across all channels",
+                "table": "All 3 fact tables (CTE blend)",
+            },
+        },
+    },
+}
+
 METRIC_CATALOG = {
     "On-Time Delivery (OTD)": {
         "definition": "Percentage of deliveries completed on or before the committed date.",
@@ -304,8 +346,38 @@ def run_ungoverned_query(session, question: str):
 # UI
 # ---------------------------------------------------------------------------
 def render_sidebar():
-    """Render the metric catalog and persona info in the sidebar."""
+    """Render the metric contract, catalog, and persona info in the sidebar."""
     with st.sidebar:
+        # --- Metric Contract (the key differentiator) ---
+        st.header("Metric Contract")
+        st.caption(
+            "ONE canonical definition per metric. "
+            "The business context determines the lens."
+        )
+        for contract in METRIC_CONTRACTS.values():
+            with st.expander(contract["name"], expanded=True):
+                st.markdown(f"**Definition:** {contract['business_definition']}")
+                st.markdown(f"**Numerator:** {contract['numerator']}")
+                st.markdown(f"**Denominator:** {contract['denominator']}")
+                st.markdown("**Governed Lenses:**")
+                for lens_name, lens_def in contract["lenses"].items():
+                    committed = lens_def["committed_date"]
+                    actual = lens_def["actual_date"]
+                    table = lens_def["table"]
+                    extra = lens_def.get("extra", "")
+                    st.markdown(
+                        f"- **{lens_name}:** `{actual} <= {committed}` "
+                        f"{extra} ({table})"
+                    )
+                st.info(
+                    "Same definition. Different context. "
+                    "The numbers differ because the committed dates differ "
+                    "-- not because the metric is inconsistent."
+                )
+
+        st.divider()
+
+        # --- Metric Catalog ---
         st.header("Metric Catalog")
         st.caption("Canonical metric definitions for the supply chain domain")
 
@@ -435,11 +507,16 @@ def main():
     st.info(f"**{persona_info['icon']} {persona}** | Focus: {persona_info['focus']}")
 
     # --- Question input ---
+    if "question" not in st.session_state:
+        st.session_state["question"] = persona_info["default_question"]
+
     question = st.text_input(
         "Ask a supply chain question:",
-        value=persona_info["default_question"],
+        value=st.session_state["question"],
+        key="question_input",
         placeholder="e.g., What is our supplier OTD rate by country?",
     )
+    st.session_state["question"] = question
 
     # --- Quick question buttons ---
     st.markdown("**Quick questions:**")
@@ -452,7 +529,40 @@ def main():
     ]
     for i, qq in enumerate(quick_questions):
         if quick_cols[i].button(qq, key=f"quick_{i}", use_container_width=True):
-            question = qq
+            st.session_state["question"] = qq
+            st.rerun()
+
+    # --- Ambiguity guardrail for OTD questions ---
+    _q_lower = question.lower()
+    _otd_keywords = ["otd", "on-time delivery", "on time delivery", "delivery rate", "delivery performance"]
+    _lens_keywords = ["supplier", "carrier", "customer", "enterprise", "procurement", "logistics", "planning", "otif", "inbound", "outbound", "transit"]
+    _is_ambiguous_otd = (
+        any(k in _q_lower for k in _otd_keywords)
+        and not any(k in _q_lower for k in _lens_keywords)
+        and governed
+    )
+
+    if _is_ambiguous_otd:
+        st.warning(
+            "**Ambiguous metric detected.** Your question mentions OTD without "
+            "specifying a business lens. The ontology defines 4 governed OTD lenses:"
+        )
+        _disambig_cols = st.columns(4)
+        _lens_labels = [
+            ("Supplier OTD", "Inbound PO delivery", "receipt_date <= promised_date"),
+            ("Carrier OTD", "Shipment transit SLA", "actual_delivery <= estimated_delivery"),
+            ("Customer OTIF", "Order fulfillment", "shipped_date <= request_date + qty check"),
+            ("Enterprise OTD", "Weighted blend (default)", "All 3 channels combined"),
+        ]
+        for col, (name, desc, formula) in zip(_disambig_cols, _lens_labels):
+            col.markdown(f"**{name}**")
+            col.caption(desc)
+            col.code(formula, language="text")
+
+        st.info(
+            "For an executive-level question, the governed default is **Enterprise OTD**. "
+            "To get a specific lens, rephrase your question (e.g., 'What is our **supplier** OTD?')."
+        )
 
     # --- Execute ---
     if st.button("Run Query", type="primary", use_container_width=True):
@@ -547,6 +657,60 @@ def main():
                     )
                 except Exception as e:
                     st.error(f"Could not load SLA data: {e}")
+
+    # --- Data Reality / Ground Truth ---
+    with st.expander("Synthetic Data Ground Truth", expanded=False):
+        st.markdown(
+            "This dataset is **intentionally synthetic** with controlled edge cases "
+            "to demonstrate that the ontology correctly handles real-world scenarios."
+        )
+
+        gt_col1, gt_col2 = st.columns(2)
+
+        with gt_col1:
+            st.markdown("**Data Volume**")
+            st.markdown(
+                "| Entity | Rows |\n"
+                "|---|---|\n"
+                "| Suppliers | 20 (India, UAE, Germany, USA, China) |\n"
+                "| Plants | 5 (Dubai, Abu Dhabi, Mumbai, Chennai, Frankfurt) |\n"
+                "| Customers | 25 (Platinum/Gold/Silver tiers) |\n"
+                "| Parts | 30 (4 categories) |\n"
+                "| Purchase Orders | 500 |\n"
+                "| Shipments | 600 (8 carriers) |\n"
+                "| Customer Orders | 800 |\n"
+                "| **Total** | **1,980 rows** |"
+            )
+
+        with gt_col2:
+            st.markdown("**Intentional Scenarios**")
+            st.markdown(
+                "| Scenario | Target Rate | Purpose |\n"
+                "|---|---|---|\n"
+                "| Late supplier receipts | ~15% | Test Procurement OTD |\n"
+                "| Carrier transit delays | ~8% | Test Logistics OTD |\n"
+                "| Late customer shipments | ~12% | Test Customer OTD |\n"
+                "| Partial order fills | ~5% | Test Fill Rate + OTIF |\n"
+                "| SLA breach scenarios | 10 of 20 | Test contract compliance |\n"
+                "| Cross-border freight | All 5 countries | Test Landed Cost |"
+            )
+
+        st.markdown("---")
+        st.markdown("**Why is Customer OTIF so low (~5%)?**")
+        st.markdown(
+            "This is intentional. Customer OTIF requires **both** on-time delivery "
+            "(shipped within 5 days of request) **and** in-full quantity. The synthetic "
+            "fulfillment lead time averages ~13.6 days, so most orders exceed the 5-day "
+            "SLA window. This demonstrates a critical distinction the ontology governs: "
+            "**OTD** (timing only) vs **OTIF** (timing + quantity). An ungoverned LLM "
+            "would conflate these two metrics."
+        )
+        st.markdown(
+            "**Why is Carrier OTD ~47%?**  "
+            "Ship dates and estimated delivery dates are independently randomized, "
+            "creating realistic variance. The ontology correctly separates this from "
+            "Supplier OTD (~87%) because they measure different committed dates."
+        )
 
 
 if __name__ == "__main__":

@@ -190,3 +190,24 @@ Tools Implemented:
 Technology: MCP Python SDK v2.2.0, MCPServer with stdio transport.
 Testing: 3/3 tool invocations passed against live Snowflake data.
 
+================================================================================
+9. STEP 8: METRIC CONTRACT PATTERN & GUARDRAILS (2026-10-03)
+================================================================================
+Prompt to CoCo:
+  "Add a Metric Contract pattern to the Streamlit sidebar that explicitly defines
+   OTD as ONE metric with ONE definition, showing how lenses route to different
+   committed dates. Add an ambiguity guardrail that detects vague OTD questions
+   and shows a disambiguation panel. Add a Data Reality section explaining
+   synthetic data scenarios and why OTIF is ~5%."
+
+Changes Made:
+  1. METRIC_CONTRACTS dict added to streamlit/app.py — defines OTD as a canonical
+     contract with numerator/denominator/exclusions/lenses, displayed in sidebar.
+  2. Ambiguity guardrail — detects OTD keywords without lens qualifiers, shows
+     all 4 governed lenses with formulas before allowing query execution.
+  3. Data Reality section — explains row counts, intentional edge case scenarios,
+     and provides clear rationale for low OTIF (5.39%) and Carrier OTD (47.52%).
+  4. YAML custom_instructions updated to reference metric contract pattern.
+  5. README Section 6 rewritten with metric contract diagram and explanation.
+  6. README row count fixed: 1,920 -> 1,980 (actual verified count).
+

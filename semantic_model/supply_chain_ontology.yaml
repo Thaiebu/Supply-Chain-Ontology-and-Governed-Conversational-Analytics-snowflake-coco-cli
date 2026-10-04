@@ -912,13 +912,29 @@ verified_queries:
 
 # ─── CUSTOM INSTRUCTIONS ──────────────────────────────────
 custom_instructions: >
-  This semantic model covers a multi-echelon supply chain with procurement,
-  logistics, and customer fulfillment data. When answering questions about
-  "on-time delivery" or "OTD", always clarify which lens applies:
-  (1) Supplier/Procurement OTD from purchase_orders,
-  (2) Carrier/Logistics OTD from shipments,
-  (3) Customer/Planning OTIF from customer_orders, or
-  (4) Enterprise OTD which is the weighted average across all three.
+  METRIC CONTRACT: This semantic model enforces a canonical metric contract
+  pattern. Each business metric has ONE governed definition that applies
+  across all personas. The business context (lens) determines which
+  committed date and source table apply, but the definition never changes.
+
+  ON-TIME DELIVERY (OTD) CONTRACT:
+    Definition: Percentage of eligible deliveries completed on or before
+    the applicable committed date.
+    Numerator: deliveries where actual_date <= committed_date
+    Denominator: all closed/completed deliveries (exclude open/cancelled)
+    Governed Lenses:
+      (1) Supplier/Procurement: receipt_date <= promised_date (FCT_PURCHASE_ORDERS)
+      (2) Carrier/Logistics: actual_delivery_date <= estimated_delivery_date (FCT_SHIPMENTS)
+      (3) Customer/Planning OTIF: shipped_date <= request_date + 5 days AND
+          shipped_qty >= ordered_qty (FCT_CUSTOMER_ORDERS)
+      (4) Enterprise: weighted average across all three lenses
+
+  When a user asks about "on-time delivery" or "OTD" without specifying a lens,
+  ALWAYS clarify which lens applies. If the question is from an executive or
+  is generic, default to Enterprise OTD but state which lens was used.
+  The numbers differ across lenses because the committed dates differ --
+  NOT because the metric is inconsistent.
+
   For fill rate questions, distinguish between inbound (PO fill rate) and
   outbound (customer order fill rate). Landed cost includes unit_cost_ea,
   freight_cost per unit, and customs_tariff_cost per unit. Days of Inventory
