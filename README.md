@@ -198,7 +198,11 @@ In raw SQL, asking *"What is our on-time delivery rate?"* has no single answer:
 
 #### 2. Complex Formula Encoding & Division Safety
 Landed cost is not a column; it is an arithmetic business definition:
-$$\text{Landed Cost} = \text{unit\_cost\_ea} + \frac{\text{freight\_cost}}{\text{order\_qty}} + \frac{\text{customs\_tariff\_cost}}{\text{order\_qty}}$$
+
+$$
+\text{Landed Cost} = \text{Unit Cost} + \frac{\text{Freight Cost}}{\text{Order Qty}} + \frac{\text{Customs Tariff Cost}}{\text{Order Qty}}
+$$
+
 Ungoverned LLMs routinely perform integer division, forget `NULLIF(order_qty, 0)` guards, or divide freight across the entire batch instead of per unit. The ontology hardcodes verified mathematical expressions into semantic dimensions and measures so every generated query is mathematically sound.
 
 #### 3. Chasm Traps & Multi-Join Fan-Out Protection
